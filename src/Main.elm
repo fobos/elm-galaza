@@ -1,19 +1,35 @@
+import Graphics.Collage exposing (..)
 import Graphics.Element exposing (..)
+import Color exposing (..)
 import Time exposing (..)
+import Window
 import Keyboard
 
+
 -- MODEL
+(gameWidth, gameHeight) = (600,400)
+(halfWidth, halfHeight) = (300,200)
+
+type alias Game =
+  { ship : Ship
+  }
+
 type alias Ship =
-  { position : Float  -- just 1 degree of freedom (left-right)
-  , velocity : Float  -- either 0, 1 or -1
+  { x : Float  -- just 1 degree of freedom (left-right)
+  , vx : Float  -- either 0, 1 or -1
   , shooting : Bool
   }
 
 initShip : Ship
 initShip =
-  { position = 0
-  , velocity = 0
+  { x = 0
+  , vx = 0
   , shooting = False
+  }
+
+defaultGame : Game
+defaultGame =
+  { ship = initShip
   }
 
 type alias Keys = { x : Int, y : Int }
@@ -21,29 +37,54 @@ type alias Keys = { x : Int, y : Int }
 -- UPDATE
 applyPhysics : Float -> Ship -> Ship
 applyPhysics dt ship =
-  { ship | position = ship.position + ship.velocity * dt }
+    { ship | x = ship.x + ship.vx * dt }
 
-updateVelocity : Float -> Ship -> Ship
-updateVelocity newVelocity ship =
-  { ship | velocity = newVelocity }
+updateShip : (Float, Keys) -> Ship -> Ship
+updateShip (dt, dir) ship =
+  let
+    isShooting  = dir.y > 0
+    movedShip = applyPhysics dt { ship | vx = toFloat dir.x }
+  in
+    { movedShip |
+        x = clamp (27 - halfWidth) (halfWidth - 27) movedShip.x,
+        shooting = isShooting
+    }
 
-updateShooting : Bool -> Ship -> Ship
-updateShooting isShooting ship =
-  { ship | shooting = isShooting }
-
-update : (Float, Keys) -> Ship -> Ship
-update (dt, keys) ship =
-  let newVel      = toFloat keys.x
-      isShooting  = keys.y > 0
-  in  updateVelocity newVel (updateShooting isShooting (applyPhysics dt ship))
-
+update : (Float, Keys) -> Game -> Game
+update input game =
+  {game | ship = (updateShip input game.ship) }
 
 -- SIGNALS
 inputSignal : Signal (Float, Keys)
 inputSignal =
-  let delta = fps 30
+  let delta = fps 35
       tuples = Signal.map2 (,) delta Keyboard.arrows
   in  Signal.sampleOn delta tuples
 
+-- VIEW
+
+view : (Int, Int) -> Game -> Element
+view (w, h) game =
+  flow down [ show game.ship,
+  container w h middle <|
+    collage gameWidth gameHeight
+      [ rect gameWidth gameHeight
+          |> filled (rgb 60 100 60)
+      , rect 50 10
+          |> make game.ship
+      ]
+      ]
+
+
+--make : a -> Shape -> Form
+make obj shape =
+  shape
+    |> filled white
+    |> move (obj.x, (10 - halfHeight))
+
+
+
+
 main : Signal Element
-main = Signal.map show (Signal.foldp update initShip inputSignal)
+--main = Signal.map show (Signal.foldp updateShip initShip inputSignal)
+main = Signal.map2 view Window.dimensions (Signal.foldp update defaultGame inputSignal)
