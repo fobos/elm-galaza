@@ -70,7 +70,9 @@ view (w, h) game =
     collage gameWidth gameHeight
       [ rect gameWidth gameHeight
           |> filled (rgb 60 100 60)
-      , rect 50 10
+      --, rect 50 10
+      --    |> make game.ship
+      , polygon [(0,0), (0,10), (10,10), (10,20), (20,20), (20,25), (25,25), (25,20), (35,20), (35,10), (45,10), (45,0)]
           |> make game.ship
       ]
       ]
